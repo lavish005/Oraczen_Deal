@@ -17,7 +17,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); // loads .env file into process.env
+require('dotenv').config({ quiet: true }); // quiet: true suppresses dotenv v18's verbose banner (fixes red line in PowerShell)
 
 const catalogRouter = require('./routes/catalog');
 const quotesRouter = require('./routes/quotes');

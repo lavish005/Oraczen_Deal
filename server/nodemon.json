@@ -1,0 +1,6 @@
+{
+  "colours": false,
+  "watch": ["."],
+  "ext": "js,mjs,cjs,json",
+  "ignore": ["node_modules", "tests"]
+}
