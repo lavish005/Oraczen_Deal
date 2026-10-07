@@ -1,21 +1,3 @@
-/**
- * quoteCalculator.test.js — Tests for the core business logic
- *
- * WHAT IS JEST?
- * Jest is a testing framework for JavaScript. You write test cases using:
- *   - describe(): groups related tests together
- *   - test() or it(): a single test case
- *   - expect(): what you expect the result to be
- *
- * HOW TO RUN THESE TESTS:
- *   cd server
- *   npm test
- *
- * These tests call the functions in quoteCalculator.js directly.
- * They do NOT need a running server or MongoDB connection.
- * This is called "unit testing" — testing one unit (function) in isolation.
- */
-
 const {
   findTier,
   validateDiscount,
@@ -27,30 +9,23 @@ const {
   calculateTotals,
 } = require('../services/quoteCalculator');
 
-// ─────────────────────────────────────────────
-// PRICING TIER TESTS
-// ─────────────────────────────────────────────
 describe('findTier — Pricing Tier Boundaries', () => {
 
-  // Test 1
   test('9 seats → STARTER tier', () => {
     const tier = findTier(9);
     expect(tier.code).toBe('STARTER');
   });
 
-  // Test 2
   test('10 seats → GROWTH tier (boundary: just above STARTER)', () => {
     const tier = findTier(10);
     expect(tier.code).toBe('GROWTH');
   });
 
-  // Test 3
   test('49 seats → GROWTH tier (boundary: just below ENTERPRISE)', () => {
     const tier = findTier(49);
     expect(tier.code).toBe('GROWTH');
   });
 
-  // Test 4
   test('50 seats → ENTERPRISE tier (boundary: first ENTERPRISE seat count)', () => {
     const tier = findTier(50);
     expect(tier.code).toBe('ENTERPRISE');
@@ -82,30 +57,24 @@ describe('findTier — Pricing Tier Boundaries', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// DISCOUNT VALIDATION TESTS
-// ─────────────────────────────────────────────
 describe('validateDiscount — Discount Ceiling Rules', () => {
 
-  // Test 5
   test('STARTER + 11% discount → throws error (max is 10%)', () => {
-    const tier = findTier(5); // STARTER
-
-    // expect(...).toThrow() checks that the function throws an error
+    const tier = findTier(5);
     expect(() => {
       validateDiscount(11, tier);
     }).toThrow('exceeds the STARTER tier maximum of 10%');
   });
 
   test('GROWTH + 21% discount → throws error (max is 20%)', () => {
-    const tier = findTier(20); // GROWTH
+    const tier = findTier(20);
     expect(() => {
       validateDiscount(21, tier);
     }).toThrow('exceeds the GROWTH tier maximum of 20%');
   });
 
   test('ENTERPRISE + 31% discount → throws error (max is 30%)', () => {
-    const tier = findTier(50); // ENTERPRISE
+    const tier = findTier(50);
     expect(() => {
       validateDiscount(31, tier);
     }).toThrow('exceeds the ENTERPRISE tier maximum of 30%');
@@ -113,7 +82,6 @@ describe('validateDiscount — Discount Ceiling Rules', () => {
 
   test('STARTER + 10% discount → valid (at the limit, should not throw)', () => {
     const tier = findTier(5);
-    // This should NOT throw — expect no error
     expect(() => {
       validateDiscount(10, tier);
     }).not.toThrow();
@@ -134,26 +102,20 @@ describe('validateDiscount — Discount Ceiling Rules', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// APPROVAL LOGIC TESTS
-// ─────────────────────────────────────────────
 describe('determineApproval — Approval Rules', () => {
 
-  // Test 6: discount > 15%
   test('discount of 16% → approval required (discount_above_15_percent)', () => {
     const result = determineApproval(16, 1000, false);
     expect(result.approvalRequired).toBe(true);
     expect(result.approvalReasons).toContain('discount_above_15_percent');
   });
 
-  // Test 7: total > $25,000
   test('total of $26,000 → approval required (total_above_25000)', () => {
     const result = determineApproval(0, 26000, false);
     expect(result.approvalRequired).toBe(true);
     expect(result.approvalReasons).toContain('total_above_25000');
   });
 
-  // Test 8: annual commitment + discount > 10%
   test('annual commitment + 11% discount → approval required (annual_commitment_discount_above_10_percent)', () => {
     const result = determineApproval(11, 5000, true);
     expect(result.approvalRequired).toBe(true);
@@ -173,7 +135,6 @@ describe('determineApproval — Approval Rules', () => {
   });
 
   test('multiple rules triggered → all reasons are returned', () => {
-    // discount 16% (triggers rule 1) AND total $26,000 (triggers rule 2)
     const result = determineApproval(16, 26000, false);
     expect(result.approvalRequired).toBe(true);
     expect(result.approvalReasons).toContain('discount_above_15_percent');
@@ -182,7 +143,6 @@ describe('determineApproval — Approval Rules', () => {
   });
 
   test('all three rules triggered simultaneously', () => {
-    // discount 20% (rule 1 + rule 3), total $30,000 (rule 2)
     const result = determineApproval(20, 30000, true);
     expect(result.approvalRequired).toBe(true);
     expect(result.approvalReasons).toContain('discount_above_15_percent');
@@ -202,9 +162,6 @@ describe('determineApproval — Approval Rules', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// DUPLICATE SKU MERGING
-// ─────────────────────────────────────────────
 describe('mergeLines — Duplicate SKU handling', () => {
   test('two lines with same SKU are merged by adding quantities', () => {
     const input = [
@@ -214,7 +171,7 @@ describe('mergeLines — Duplicate SKU handling', () => {
     const merged = mergeLines(input);
     expect(merged).toHaveLength(1);
     expect(merged[0].sku).toBe('AGENT-CORE');
-    expect(merged[0].quantity).toBe(15); // 5 + 10
+    expect(merged[0].quantity).toBe(15);
   });
 
   test('different SKUs are not merged', () => {
@@ -234,14 +191,11 @@ describe('mergeLines — Duplicate SKU handling', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// LINE CALCULATION
-// ─────────────────────────────────────────────
 describe('buildLines — Line total calculation', () => {
 
   test('Agent Core × 10 → line total = $1,200', () => {
     const lines = buildLines([{ sku: 'AGENT-CORE', quantity: 10 }]);
-    expect(lines[0].lineTotal).toBe(1200); // 10 × $120
+    expect(lines[0].lineTotal).toBe(1200);
     expect(lines[0].unitPrice).toBe(120);
   });
 
@@ -264,9 +218,6 @@ describe('buildLines — Line total calculation', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// SUBTOTAL
-// ─────────────────────────────────────────────
 describe('calculateSubtotal', () => {
   test('sums all line totals correctly', () => {
     const lines = [
@@ -277,9 +228,6 @@ describe('calculateSubtotal', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// TOTALS (discount + final)
-// ─────────────────────────────────────────────
 describe('calculateTotals — Discount and Final Total', () => {
   test('20% discount on $10,000 → discountAmount=$2,000, total=$8,000', () => {
     const result = calculateTotals(10000, 20);
@@ -300,9 +248,6 @@ describe('calculateTotals — Discount and Final Total', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// FULL INTEGRATION: calculateQuote
-// ─────────────────────────────────────────────
 describe('calculateQuote — Full calculation pipeline', () => {
 
   test('basic quote: Agent Core × 50, 20% discount', () => {
@@ -314,10 +259,10 @@ describe('calculateQuote — Full calculation pipeline', () => {
     });
 
     expect(result.tier).toBe('ENTERPRISE');
-    expect(result.subtotal).toBe(6000);          // 50 × $120
-    expect(result.discountAmount).toBe(1200);    // 20% of $6,000
+    expect(result.subtotal).toBe(6000);
+    expect(result.discountAmount).toBe(1200);
     expect(result.total).toBe(4800);
-    expect(result.approvalRequired).toBe(true);  // discount > 15%
+    expect(result.approvalRequired).toBe(true);
     expect(result.approvalReasons).toContain('discount_above_15_percent');
   });
 
@@ -332,7 +277,6 @@ describe('calculateQuote — Full calculation pipeline', () => {
       annualCommitment: false,
     });
 
-    // 50 × $120 + 50 × $80 = $6,000 + $4,000 = $10,000
     expect(result.subtotal).toBe(10000);
     expect(result.total).toBe(10000);
     expect(result.approvalRequired).toBe(false);
@@ -352,9 +296,9 @@ describe('calculateQuote — Full calculation pipeline', () => {
   test('discount too high → throws error', () => {
     expect(() => {
       calculateQuote({
-        seats: 5, // STARTER: max 10%
+        seats: 5,
         lines: [{ sku: 'AGENT-CORE', quantity: 1 }],
-        discountPct: 15, // 15 > 10 → invalid
+        discountPct: 15,
         annualCommitment: false,
       });
     }).toThrow('exceeds the STARTER tier maximum of 10%');
@@ -368,7 +312,7 @@ describe('calculateQuote — Full calculation pipeline', () => {
       annualCommitment: false,
     });
 
-    expect(result.subtotal).toBe(2500); // ONBOARDING = $2,500
+    expect(result.subtotal).toBe(2500);
   });
 
   test('duplicate SKUs in input are merged before calculating', () => {
@@ -376,7 +320,7 @@ describe('calculateQuote — Full calculation pipeline', () => {
       seats: 10,
       lines: [
         { sku: 'AGENT-CORE', quantity: 5 },
-        { sku: 'AGENT-CORE', quantity: 10 }, // same SKU — should be merged to 15
+        { sku: 'AGENT-CORE', quantity: 10 },
       ],
       discountPct: 0,
       annualCommitment: false,
@@ -384,7 +328,7 @@ describe('calculateQuote — Full calculation pipeline', () => {
 
     expect(result.lines).toHaveLength(1);
     expect(result.lines[0].quantity).toBe(15);
-    expect(result.subtotal).toBe(1800); // 15 × $120
+    expect(result.subtotal).toBe(1800);
   });
 
   test('result always contains tier, subtotal, discountAmount, total, approvalRequired, approvalReasons', () => {

@@ -1,18 +1,3 @@
-/**
- * SavedQuotesPage.jsx — Page 2: List of all saved quotes
- *
- * What this page does:
- * 1. Calls GET /api/quotes to get all saved quotes from MongoDB
- * 2. Displays them in a table with: customer, seats, tier, total, status, date
- * 3. Each row has a "View" link that goes to /quotes/:id (the review page)
- * 4. Has a "Create New Quote" button to go back to the form
- *
- * STATE:
- * - quotes: array of quote objects from the backend
- * - loading: true while fetching
- * - error: error message if the fetch fails
- */
-
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -25,7 +10,6 @@ export default function SavedQuotesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load all quotes when the page mounts
   useEffect(() => {
     axios.get(`${API}/quotes`)
       .then(res => {
@@ -38,8 +22,6 @@ export default function SavedQuotesPage() {
       });
   }, []);
 
-  // Format a date string into something readable
-  // e.g. "2024-01-15T10:30:00.000Z" → "Jan 15, 2024"
   function formatDate(dateString) {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -65,7 +47,6 @@ export default function SavedQuotesPage() {
 
   return (
     <div>
-      {/* Page header with action button */}
       <div className="page-header flex justify-between" style={{ alignItems: 'center' }}>
         <div>
           <h1 className="page-title">Saved Quotes</h1>
@@ -76,7 +57,6 @@ export default function SavedQuotesPage() {
         </Link>
       </div>
 
-      {/* Empty state */}
       {quotes.length === 0 ? (
         <div className="card">
           <div className="empty-state">
@@ -85,7 +65,6 @@ export default function SavedQuotesPage() {
           </div>
         </div>
       ) : (
-        /* Quotes table */
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <table className="quotes-table">
             <thead>
@@ -105,7 +84,6 @@ export default function SavedQuotesPage() {
                   <td style={{ fontWeight: 600 }}>{quote.customerName}</td>
                   <td>{quote.seats}</td>
                   <td>
-                    {/* Show the tier badge — the calculation is nested inside calculation.tier */}
                     <span className={`tier-badge tier-${quote.calculation?.tier}`}>
                       {quote.calculation?.tier || '—'}
                     </span>
@@ -124,7 +102,6 @@ export default function SavedQuotesPage() {
                     {quote.createdAt ? formatDate(quote.createdAt) : '—'}
                   </td>
                   <td>
-                    {/* Link to the review page for this specific quote */}
                     <Link
                       to={`/quotes/${quote._id}`}
                       className="btn btn-secondary btn-sm"

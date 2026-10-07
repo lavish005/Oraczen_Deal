@@ -1,26 +1,3 @@
-/**
- * QuoteReviewPage.jsx — Page 3: Review a single saved quote
- *
- * What this page does:
- * 1. Reads the quote :id from the URL (e.g. /quotes/abc123)
- * 2. Calls GET /api/quotes/:id to load the full quote from MongoDB
- * 3. Displays all quote details: customer, seats, tier, products, totals, approval
- * 4. Shows the current status and available status transition buttons
- * 5. When a status button is clicked, calls PATCH /api/quotes/:id/status
- *
- * STATUS TRANSITIONS (enforced by the backend):
- *   draft      → can Submit (→ submitted)
- *   submitted  → can Approve (→ approved) or Reject (→ rejected)
- *   approved   → no transitions available (terminal state)
- *   rejected   → no transitions available (terminal state)
- *
- * STATE:
- * - quote: the full quote object from the backend
- * - loading: true while fetching
- * - error: error message if fetch or status update fails
- * - statusUpdating: true while PATCH request is in progress
- */
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
@@ -28,7 +5,6 @@ import { formatCurrency } from '../App';
 
 const API = 'http://localhost:5000/api';
 
-// Human-readable labels for approval reason codes
 const REASON_LABELS = {
   discount_above_15_percent: 'Discount is above 15%',
   total_above_25000: 'Total exceeds $25,000',
@@ -36,7 +12,6 @@ const REASON_LABELS = {
 };
 
 export default function QuoteReviewPage() {
-  // useParams reads URL parameters. If the URL is /quotes/abc123, then params.id = "abc123"
   const { id } = useParams();
 
   const [quote, setQuote] = useState(null);
@@ -46,7 +21,6 @@ export default function QuoteReviewPage() {
   const [statusError, setStatusError] = useState(null);
   const [statusSuccess, setStatusSuccess] = useState(null);
 
-  // Load the quote when the page mounts (or when the id changes)
   useEffect(() => {
     setLoading(true);
     axios.get(`${API}/quotes/${id}`)
@@ -60,7 +34,6 @@ export default function QuoteReviewPage() {
       });
   }, [id]);
 
-  // ── Status Transition ─────────────────────────────────────
   async function handleStatusChange(newStatus) {
     setStatusError(null);
     setStatusSuccess(null);
@@ -70,7 +43,6 @@ export default function QuoteReviewPage() {
       const response = await axios.patch(`${API}/quotes/${id}/status`, {
         status: newStatus,
       });
-      // Update the quote in state with the new version returned by the server
       setQuote(response.data);
       setStatusSuccess(`Status updated to "${newStatus}" successfully.`);
     } catch (err) {
@@ -80,8 +52,6 @@ export default function QuoteReviewPage() {
       setStatusUpdating(false);
     }
   }
-
-  // ── Render helpers ────────────────────────────────────────
 
   if (loading) return <div className="loading">Loading quote...</div>;
 
@@ -99,22 +69,19 @@ export default function QuoteReviewPage() {
 
   const { customerName, seats, lines, discountPct, annualCommitment, calculation, status, createdAt } = quote;
 
-  // Build the list of available next status transitions for the current status
-  // These mirror the backend ALLOWED_TRANSITIONS object
   const transitions = {
     draft:     [{ label: 'Submit for Approval', value: 'submitted', style: 'btn-primary' }],
     submitted: [
       { label: 'Approve', value: 'approved', style: 'btn-success' },
       { label: 'Reject',  value: 'rejected', style: 'btn-danger' },
     ],
-    approved: [], // no further transitions
-    rejected: [], // no further transitions
+    approved: [],
+    rejected: [],
   };
   const availableTransitions = transitions[status] || [];
 
   return (
     <div>
-      {/* Back link + page header */}
       <div className="page-header">
         <Link
           to="/quotes"
@@ -136,13 +103,10 @@ export default function QuoteReviewPage() {
         </div>
       </div>
 
-      {/* Two-column layout: details left, actions right */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
 
-        {/* ── LEFT: Quote Details ──────────────────────── */}
         <div>
 
-          {/* Customer & Seat info */}
           <div className="card mb-4">
             <h2 className="card-title">Customer Information</h2>
             <div className="detail-row">
@@ -163,7 +127,6 @@ export default function QuoteReviewPage() {
             </div>
           </div>
 
-          {/* Product lines */}
           <div className="card mb-4">
             <h2 className="card-title">Products</h2>
             {lines.map(line => (
@@ -179,7 +142,6 @@ export default function QuoteReviewPage() {
             ))}
           </div>
 
-          {/* Pricing summary */}
           <div className="card mb-4">
             <h2 className="card-title">Pricing Summary</h2>
             <div className="detail-row">
@@ -202,7 +164,6 @@ export default function QuoteReviewPage() {
             </div>
           </div>
 
-          {/* Approval section */}
           <div className="card">
             <h2 className="card-title">Approval</h2>
             <div className={`approval-banner ${calculation.approvalRequired ? 'approval-required' : 'approval-not-required'}`}>
@@ -220,12 +181,10 @@ export default function QuoteReviewPage() {
           </div>
         </div>
 
-        {/* ── RIGHT: Status Actions ────────────────────── */}
         <div>
           <div className="card">
             <h2 className="card-title">Status Workflow</h2>
 
-            {/* Current status display */}
             <div style={{ marginBottom: '16px' }}>
               <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '6px' }}>
                 Current Status
@@ -235,7 +194,6 @@ export default function QuoteReviewPage() {
               </span>
             </div>
 
-            {/* Status flow diagram (simple text) */}
             <div style={{ fontSize: '0.78rem', color: 'var(--color-muted)', marginBottom: '16px', lineHeight: '1.8' }}>
               <span style={{ color: status === 'draft' ? 'var(--color-text)' : undefined, fontWeight: status === 'draft' ? 700 : undefined }}>Draft</span>
               {' → '}
@@ -249,7 +207,6 @@ export default function QuoteReviewPage() {
               </span>
             </div>
 
-            {/* Status feedback messages */}
             {statusSuccess && (
               <div className="alert alert-success" style={{ marginBottom: '12px' }}>
                 {statusSuccess}
@@ -261,7 +218,6 @@ export default function QuoteReviewPage() {
               </div>
             )}
 
-            {/* Action buttons for available transitions */}
             {availableTransitions.length > 0 ? (
               <div className="status-actions" style={{ flexDirection: 'column' }}>
                 {availableTransitions.map(t => (
@@ -285,7 +241,6 @@ export default function QuoteReviewPage() {
             )}
           </div>
 
-          {/* Quick summary card */}
           <div className="card mt-4">
             <h2 className="card-title">Quick Summary</h2>
             <div className="detail-row">

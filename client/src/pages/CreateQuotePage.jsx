@@ -1,37 +1,10 @@
-/**
- * CreateQuotePage.jsx — Page 1: Build a new quote
- *
- * What this page does:
- * 1. Loads the product catalog from GET /api/catalog
- * 2. Lets the user fill in customer name, seats, products, discount, annual commitment
- * 3. Calls POST /api/quotes/calculate whenever the form data changes
- *    → This shows the live quote preview on the right side
- * 4. When the user clicks "Save Quote", calls POST /api/quotes
- *    → The backend validates and saves; we then navigate to the saved quotes page
- *
- * STATE MANAGEMENT (plain React useState):
- * - catalog: the product list fetched from the server
- * - form: all the form fields (customerName, seats, lines, discountPct, annualCommitment)
- * - preview: the calculation result returned by /api/quotes/calculate
- * - errors: validation error messages to show under form fields
- * - saving: true while we are waiting for POST /api/quotes to complete
- *
- * WHY DO WE CALL /calculate SEPARATELY FROM /save?
- * The calculate endpoint returns the preview instantly WITHOUT storing anything.
- * The save endpoint stores the quote permanently.
- * This way, the user can see the total before committing to save.
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { formatCurrency } from '../App';
 
-// The base URL of the backend API
-// In development, the backend runs on port 5000
 const API = 'http://localhost:5000/api';
 
-// Human-readable labels for approval reason codes
 const REASON_LABELS = {
   discount_above_15_percent: 'Discount is above 15%',
   total_above_25000: 'Total exceeds $25,000',
@@ -41,40 +14,50 @@ const REASON_LABELS = {
 export default function CreateQuotePage() {
   const navigate = useNavigate();
 
-  // ── State ────────────────────────────────────────────────
-  const [catalog, setCatalog] = useState(null);     // products from server
+  const [catalog, setCatalog] = useState(null);
   const [catalogError, setCatalogError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const [form, setForm] = useState({
     customerName: '',
     seats: '',
-    lines: [{ sku: '', quantity: 1 }],   // start with one empty product line
+    lines: [{ sku: '', quantity: 1 }],
     discountPct: 0,
     annualCommitment: false,
   });
 
-  const [errors, setErrors] = useState({});         // field-level validation errors
-  const [saveError, setSaveError] = useState(null); // error from POST /api/quotes
+  const [errors, setErrors] = useState({});
+  const [saveError, setSaveError] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Preview state: result of calling /api/quotes/calculate
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  // ── Load Catalog on Mount ────────────────────────────────
   useEffect(() => {
-    axios.get(`${API}/catalog`)
-      .then(res => setCatalog(res.data))
-      .catch(() => setCatalogError('Could not load product catalog. Is the backend running?'));
-  }, []);
+    let cancelled = false;
+    async function fetchCatalog() {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await axios.get(`${API}/catalog`);
+          if (!cancelled) setCatalog(res.data);
+          return;
+        } catch {
+          if (attempt < 3) {
+            await new Promise(r => setTimeout(r, 1000 * attempt));
+          } else {
+            if (!cancelled) setCatalogError('Could not load product catalog. Is the backend running?');
+          }
+        }
+      }
+    }
+    fetchCatalog();
+    return () => { cancelled = true; };
+  }, [retryCount]);
 
-  // ── Live Preview (calculate whenever form changes) ────────
-  // useCallback makes sure this function is not re-created on every render
   const updatePreview = useCallback(async (currentForm) => {
     const { customerName, seats, lines, discountPct, annualCommitment } = currentForm;
 
-    // Only call the API if we have enough data to calculate
     const hasValidLines = lines.some(l => l.sku && l.quantity > 0);
     const hasSeats = seats !== '' && Number(seats) > 0;
 
@@ -84,7 +67,6 @@ export default function CreateQuotePage() {
       return;
     }
 
-    // Filter out empty lines (lines where no product is selected yet)
     const validLines = lines.filter(l => l.sku && l.quantity > 0);
 
     setPreviewLoading(true);
@@ -108,25 +90,19 @@ export default function CreateQuotePage() {
     }
   }, []);
 
-  // Trigger preview whenever form changes (after a short delay to avoid spamming the API)
   useEffect(() => {
     const timer = setTimeout(() => {
       updatePreview(form);
-    }, 400); // wait 400ms after the last keystroke before calling the API
+    }, 400);
 
-    return () => clearTimeout(timer); // cancel the previous timer if form changes again
+    return () => clearTimeout(timer);
   }, [form, updatePreview]);
 
-  // ── Form Handlers ─────────────────────────────────────────
-
-  // Update a simple field (customerName, seats, discountPct, annualCommitment)
   function handleFieldChange(field, value) {
     setForm(prev => ({ ...prev, [field]: value }));
-    // Clear the error for this field when the user starts typing
     setErrors(prev => ({ ...prev, [field]: null }));
   }
 
-  // Update a product line field (sku or quantity) at the given row index
   function handleLineChange(index, field, value) {
     setForm(prev => {
       const newLines = [...prev.lines];
@@ -135,7 +111,6 @@ export default function CreateQuotePage() {
     });
   }
 
-  // Add a new empty product line row
   function handleAddLine() {
     setForm(prev => ({
       ...prev,
@@ -143,7 +118,6 @@ export default function CreateQuotePage() {
     }));
   }
 
-  // Remove a product line row at the given index
   function handleRemoveLine(index) {
     setForm(prev => ({
       ...prev,
@@ -151,9 +125,6 @@ export default function CreateQuotePage() {
     }));
   }
 
-  // ── Frontend Validation ──────────────────────────────────
-  // NOTE: The backend also validates everything. This is just for immediate
-  // feedback to the user before we even make the API call.
   function validateForm() {
     const newErrors = {};
 
@@ -177,14 +148,13 @@ export default function CreateQuotePage() {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0; // true if no errors
+    return Object.keys(newErrors).length === 0;
   }
 
-  // ── Save Quote ────────────────────────────────────────────
   async function handleSave() {
     setSaveError(null);
 
-    if (!validateForm()) return; // stop if frontend validation fails
+    if (!validateForm()) return;
 
     const validLines = form.lines.filter(l => l.sku && l.quantity > 0);
 
@@ -198,7 +168,6 @@ export default function CreateQuotePage() {
         annualCommitment: form.annualCommitment,
       });
 
-      // Navigate to the saved quotes list after successful save
       navigate('/quotes');
     } catch (err) {
       const msg = err.response?.data?.error || 'Failed to save quote. Please try again.';
@@ -208,8 +177,6 @@ export default function CreateQuotePage() {
     }
   }
 
-  // ── Render ────────────────────────────────────────────────
-
   if (catalogError) {
     return (
       <div>
@@ -217,6 +184,13 @@ export default function CreateQuotePage() {
           <h1 className="page-title">Create Quote</h1>
         </div>
         <div className="alert alert-error">{catalogError}</div>
+        <button
+          className="btn btn-secondary"
+          style={{ marginTop: '12px' }}
+          onClick={() => { setCatalogError(null); setCatalog(null); setRetryCount(c => c + 1); }}
+        >
+          ↺ Retry
+        </button>
       </div>
     );
   }
@@ -227,19 +201,15 @@ export default function CreateQuotePage() {
 
   return (
     <div>
-      {/* Page header */}
       <div className="page-header">
         <h1 className="page-title">Create Quote</h1>
         <p className="page-subtitle">Fill in the details below to build a new customer quote.</p>
       </div>
 
-      {/* Two-column layout: form on left, preview on right */}
       <div className="builder-layout">
 
-        {/* ── LEFT: Quote Form ─────────────────────────── */}
         <div>
 
-          {/* Customer Info */}
           <div className="card mb-4">
             <h2 className="card-title">Customer Information</h2>
 
@@ -278,7 +248,6 @@ export default function CreateQuotePage() {
             </div>
           </div>
 
-          {/* Product Lines */}
           <div className="card mb-4">
             <h2 className="card-title">Products</h2>
 
@@ -296,7 +265,6 @@ export default function CreateQuotePage() {
               </thead>
               <tbody>
                 {form.lines.map((line, index) => {
-                  // Find the selected product in the catalog to show unit price
                   const selectedProduct = line.sku
                     ? catalog.products.find(p => p.sku === line.sku)
                     : null;
@@ -307,7 +275,6 @@ export default function CreateQuotePage() {
                   return (
                     <tr key={index}>
                       <td>
-                        {/* Dropdown to select a product */}
                         <select
                           value={line.sku}
                           onChange={e => handleLineChange(index, 'sku', e.target.value)}
@@ -336,7 +303,6 @@ export default function CreateQuotePage() {
                         {line.sku && line.quantity > 0 ? formatCurrency(lineTotal) : '—'}
                       </td>
                       <td>
-                        {/* Only show Remove if there is more than one line */}
                         {form.lines.length > 1 && (
                           <button
                             className="btn btn-danger btn-sm"
@@ -362,7 +328,6 @@ export default function CreateQuotePage() {
             </button>
           </div>
 
-          {/* Pricing Options */}
           <div className="card mb-4">
             <h2 className="card-title">Pricing Options</h2>
 
@@ -399,7 +364,6 @@ export default function CreateQuotePage() {
             </p>
           </div>
 
-          {/* Save button + error */}
           {saveError && <div className="alert alert-error">{saveError}</div>}
           <button
             className="btn btn-primary"
@@ -411,7 +375,6 @@ export default function CreateQuotePage() {
           </button>
         </div>
 
-        {/* ── RIGHT: Live Quote Preview ─────────────────── */}
         <div>
           <div className="quote-preview">
             <p className="quote-preview-title">Live Quote Preview</p>
@@ -434,13 +397,11 @@ export default function CreateQuotePage() {
 
             {preview && !previewLoading && (
               <>
-                {/* Tier */}
                 <div className="preview-row">
                   <span className="preview-label">Pricing Tier</span>
                   <span className={`tier-badge tier-${preview.tier}`}>{preview.tier}</span>
                 </div>
 
-                {/* Product lines */}
                 <div style={{ margin: '10px 0', fontSize: '0.8rem', color: 'var(--color-muted)' }}>
                   Products
                 </div>
@@ -462,13 +423,11 @@ export default function CreateQuotePage() {
 
                 <hr style={{ border: 'none', borderTop: '1px dashed var(--color-border)', margin: '10px 0' }} />
 
-                {/* Subtotal */}
                 <div className="preview-row">
                   <span className="preview-label">Subtotal</span>
                   <span className="preview-value">{formatCurrency(preview.subtotal)}</span>
                 </div>
 
-                {/* Discount */}
                 {Number(form.discountPct) > 0 && (
                   <div className="preview-row">
                     <span className="preview-label">Discount ({form.discountPct}%)</span>
@@ -478,13 +437,11 @@ export default function CreateQuotePage() {
                   </div>
                 )}
 
-                {/* Final total */}
                 <div className="preview-total-row">
                   <span className="preview-total-label">Final Total</span>
                   <span className="preview-total-value">{formatCurrency(preview.total)}</span>
                 </div>
 
-                {/* Approval */}
                 <div className={`approval-banner ${preview.approvalRequired ? 'approval-required' : 'approval-not-required'}`}>
                   <strong>
                     {preview.approvalRequired ? '⚠ Approval Required' : '✓ No Approval Required'}

@@ -1,25 +1,6 @@
-/**
- * api.test.js — Integration tests for the Express API
- *
- * WHAT IS SUPERTEST?
- * Supertest lets us make real HTTP requests to our Express app in tests,
- * without starting an actual server on a port. It "simulates" HTTP calls.
- *
- * IMPORTANT: These tests do NOT connect to your real MongoDB database.
- * They test the API validation and business logic only.
- * For full integration with MongoDB, you would need a test database.
- *
- * HOW TO RUN:
- *   cd server
- *   npm test
- */
-
 const request = require('supertest');
 const app = require('../index');
 
-// ─────────────────────────────────────────────
-// GET /api/catalog
-// ─────────────────────────────────────────────
 describe('GET /api/catalog', () => {
   test('returns 200 with products and discount_rules', async () => {
     const res = await request(app).get('/api/catalog');
@@ -41,12 +22,8 @@ describe('GET /api/catalog', () => {
   });
 });
 
-// ─────────────────────────────────────────────
-// POST /api/quotes/calculate
-// ─────────────────────────────────────────────
 describe('POST /api/quotes/calculate', () => {
 
-  // Helper to build a valid request body
   function validPayload(overrides = {}) {
     return {
       customerName: 'Test Customer',
@@ -71,7 +48,6 @@ describe('POST /api/quotes/calculate', () => {
     expect(res.body).toHaveProperty('approvalReasons');
   });
 
-  // Test 9: Unknown SKU → 400
   test('unknown SKU → 400 error', async () => {
     const res = await request(app)
       .post('/api/quotes/calculate')
@@ -86,7 +62,7 @@ describe('POST /api/quotes/calculate', () => {
   test('missing customerName → 400 error', async () => {
     const res = await request(app)
       .post('/api/quotes/calculate')
-      .send(validPayload({ customerName: '   ' })); // blank spaces
+      .send(validPayload({ customerName: '   ' }));
 
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
@@ -127,7 +103,6 @@ describe('POST /api/quotes/calculate', () => {
   });
 
   test('discount exceeds tier max → 400 error', async () => {
-    // 5 seats = STARTER = max 10%
     const res = await request(app)
       .post('/api/quotes/calculate')
       .send(validPayload({ seats: 5, discountPct: 15 }));
@@ -147,8 +122,8 @@ describe('POST /api/quotes/calculate', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.tier).toBe('ENTERPRISE');
-    expect(res.body.subtotal).toBe(6000);       // 50 × $120
-    expect(res.body.discountAmount).toBe(1200); // 20% of $6,000
+    expect(res.body.subtotal).toBe(6000);
+    expect(res.body.discountAmount).toBe(1200);
     expect(res.body.total).toBe(4800);
   });
 
@@ -186,13 +161,10 @@ describe('POST /api/quotes/calculate', () => {
       .send(validPayload({ discountPct: 0 }));
 
     expect(res.status).toBe(200);
-    expect(res.body.discountAmount).toBe(0); // 0, not undefined
+    expect(res.body.discountAmount).toBe(0);
   });
 });
 
-// ─────────────────────────────────────────────
-// Health check
-// ─────────────────────────────────────────────
 describe('GET /api/health', () => {
   test('returns status ok', async () => {
     const res = await request(app).get('/api/health');
